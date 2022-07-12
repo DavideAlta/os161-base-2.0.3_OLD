@@ -110,15 +110,41 @@ syscall(struct trapframe *tf)
 		break;
 
 	    /* Add stuff here */
-		case SYS_read:
-		retval = sys_read((int)tf->tf_a0,
-						  (userptr_t)tf->tf_a1,
-						  (int)tf->tf_a2);
-		if(retval > 0){
-			err = 1;
-		}
-		else err = 0;
+		case SYS_open:
+		err = sys_open((userptr_t)tf->tf_a0,	// filename
+					   (int)tf->tf_a1,			// flags
+					   &retval);				// retval = file descriptor	
 		break;
+
+		case SYS_read:
+		err = sys_read((int)tf->tf_a0,			// fd
+					   (userptr_t)tf->tf_a1,	// buf
+					   (size_t)tf->tf_a2,		// size (in byte)
+				   	   &retval);				// retval = read nbytes
+		break;
+
+		case SYS_close:
+		err = sys_close((int)tf->tf_a0);
+		break;
+
+		case SYS_write:
+		err = sys_write((int)tf->tf_a0,			// fd
+						(userptr_t)tf->tf_a1,	// buf
+						(size_t)tf->tf_a2,		// buf len
+						&retval);				// retval = written nbytes
+		break;
+
+		case SYS_lseek:
+		err = sys_lseek((int)tf->tf_a0,			// fd
+						(off_t)tf->tf_a1,		// offset of the pointer in bytes (could be neg)
+						(int)tf->tf_a2,			// where the seek should be performed (flag)
+						&retval);				// retval = offset of the pointers
+		break;
+
+		case SYS_dup2:
+		err = sys_dup2((int) tf->tf_a0,				// old fd
+				   (int) tf->tf_a1,				// new fd
+				   &retval);					// retval = new fd
 
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
@@ -133,6 +159,7 @@ syscall(struct trapframe *tf)
 		 * userlevel to a return value of -1 and the error
 		 * code in errno.
 		 */
+		strerror(err); // It reads the errno inside err and print the corresponding message
 		tf->tf_v0 = err;
 		tf->tf_a3 = 1;      /* signal an error */
 	}

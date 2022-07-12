@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "types.h": "c",
+        "cerrno": "c",
+        "openfile.h": "c",
+        "array": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "utility": "c",
+        "atomic": "c",
+        "*.tcc": "c",
+        "fstream": "c",
+        "sstream": "c"
+    }
+}

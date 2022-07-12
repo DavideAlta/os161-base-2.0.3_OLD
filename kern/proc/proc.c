@@ -48,6 +48,8 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
+#include <kern/unistd.h> // STDIN, STDOUT, STDERR
+#include <limits.h> // OPEN_MAX
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -81,6 +83,11 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
+
+	/* File table initialization (to NULL pointers) */
+	for(int fd=STDERR_FILENO+1;fd<OPEN_MAX;fd++){
+		proc->p_filetable[fd] = NULL;
+	}
 
 	return proc;
 }
