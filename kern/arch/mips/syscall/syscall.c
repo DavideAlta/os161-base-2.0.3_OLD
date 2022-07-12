@@ -98,7 +98,8 @@ syscall(struct trapframe *tf)
 	 */
 
 	retval = 0;
-
+	//commento inutile 
+	
 	switch (callno) {
 	    case SYS_reboot:
 		err = sys_reboot(tf->tf_a0);
