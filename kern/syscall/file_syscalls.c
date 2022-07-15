@@ -101,7 +101,7 @@ int sys_open(userptr_t filename, int flags, int *retval){
         return err;
     }
 
-    // [6] Allocate and fill the found openfile struct
+    // [6] Allocate and fill the found ot penfile struct
     curproc->p_filetable[fd] = (struct openfile *)kmalloc(sizeof(struct openfile));
 	KASSERT(curproc->p_filetable[fd] != NULL); // Check if the filetable is no more NULL
 
@@ -298,6 +298,9 @@ int sys_lseek(int fd, off_t pos, int whence, int *retval){
     int filesize;
     struct stat statbuf;
 
+    KASSERT(curthread != NULL);
+    KASSERT(curproc != NULL );
+
     spinlock_acquire(&curproc->p_filetable[fd]->of_lock);
 
     /* [1] Check fd validity */
@@ -356,6 +359,9 @@ int sys_dup2(int oldfd, int newfd, int *retval){
 
     int err;
 
+    KASSERT(curthread != NULL);
+    KASSERT(curproc != NULL );
+
     spinlock_acquire(&curproc->p_filetable[oldfd]->of_lock);
 
     /* [1] Check arguments validity */
@@ -385,6 +391,92 @@ int sys_dup2(int oldfd, int newfd, int *retval){
     return 0;
 }
 
+int sys_chdir(userptr_t pathname){
+
+    int err;
+    struct vnode *vn = NULL;
+    char kpathname[PATH_MAX];
+
+    KASSERT(curthread != NULL);
+    KASSERT(curproc != NULL );
+
+    // Check argument
+
+    // pathname was an invalid pointer.
+    if(pathname == NULL){
+        err = EFAULT;
+        return err;
+    }
+
+    // Copy the pathname string from user to kernel space to protect it
+    err = copyinstr(pathname, kpathname, sizeof(kpathname), NULL);
+    if(err)
+        return err;
+
+    /* Obtain a vnode object associated to the passed path to set */
+    err = vfs_open(kpathname, O_RDONLY, 0, &vn); // O_rdonly ??
+    if(err)
+        return err;
+
+    /* Do curproc->p_cwd = vn (spinlock handling is inside vfs_setcurdir)*/
+    err = vfs_setcurdir(vn);
+    if(err)
+        return err;
+
+    return 0;
+}
+
+int sys___getcwd(userptr_t buf, size_t buflen, int *retval){
+
+    int err;
+    struct iovec iov;
+    struct uio u;
+    void *kbuf = kmalloc(buflen); // buffer inside kernel space
+
+    KASSERT(curthread != NULL);
+    KASSERT(curproc != NULL );
+
+    // Check arguments
+
+    // buf points to an invalid address.
+    if(buf == NULL){
+        err = EFAULT;
+        return err;
+    }
+
+    /* Setup the uio record (use a proper function to init all fields) */
+	uio_kinit(&iov, &u, kbuf, buflen, 0, UIO_READ);
+    u.uio_space = curproc->p_addrspace;
+	u.uio_segflg = UIO_USERSPACE; // for user space address
+
+    // Retrieve the uio struct associated with the current directory
+    err = vfs_getcwd(&u);
+    if(err)
+        return err;
+
+    // Actual lenght of the current pathname directory is returned
+    *retval = buflen - u.uio_resid;
+
+    /*[ | | | ] buflen 4
+    [c|i|a| ] resid 0
+    rivedere retval
+    */
+
+    // 
+    if(*retval < 0){
+        err = EFAULT;
+    }
+
+    // Copy the buffer from kernel to user space to make it available for the user
+    err = copyout(kbuf, buf, buflen);
+    if(err){
+        kfree(kbuf);
+        return err;
+    }
+
+    return 0;
+}
+
 /*
 Practical example of refcount behaviour:
 
@@ -406,3 +498,4 @@ filetable[3] = NULL     |   sysfiletable[*pippo] = <empty>
 filetable[4] = NULL
 
 */
+

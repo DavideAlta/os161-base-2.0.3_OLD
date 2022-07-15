@@ -37,7 +37,10 @@
  */
 
 #include <spinlock.h>
+#include <synch.h>
 #include <limits.h>
+
+#define MAX_PROCESSES 8 // Max number of processes
 
 struct addrspace;
 struct thread;
@@ -74,7 +77,24 @@ struct proc {
 	/* add more material here as needed */
 
 	struct openfile *p_filetable[OPEN_MAX]; /* Array of pointers to openfile objects referred by file descriptors*/
+
+	pid_t p_pid; /* Process identifier */
+
+	pid_t p_parentpid; /* Pointer to parent process */
+
+	int exitcode; /* Exit code */
+
+	bool is_exited; /* The process is going to be exited */
+
+	struct semaphore p_waitsem; /* Semaphore of process for exit-waitpid mechanism */
+
 };
+
+/* Process table declaration (defined in proc.c)*/
+extern struct proc *proctable[MAX_PROCESSES]; // ??
+
+/* Counter active processes*/
+extern int proc_counter; // ??
 
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;

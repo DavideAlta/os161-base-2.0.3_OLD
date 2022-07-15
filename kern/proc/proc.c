@@ -56,6 +56,12 @@
  */
 struct proc *kproc;
 
+/* Array of processes in the system (referred by pid) */
+struct proc *proctable[MAX_PROCESSES];
+
+/* Counter active processes*/
+int proc_counter;
+
 /*
  * Create a proc structure.
  */
@@ -64,6 +70,7 @@ struct proc *
 proc_create(const char *name)
 {
 	struct proc *proc;
+	pid_t pid = 0;
 
 	proc = kmalloc(sizeof(*proc));
 	if (proc == NULL) {
@@ -88,6 +95,31 @@ proc_create(const char *name)
 	for(int fd=STDERR_FILENO+1;fd<OPEN_MAX;fd++){
 		proc->p_filetable[fd] = NULL;
 	}
+
+	/* Initialize process table */
+	if(strcmp(name,"[kernel]") == 0){
+		proc->p_pid = 0;
+		proc->p_parentpid = 0;
+		proctable[0] = curproc;
+		proc_counter = 1;
+		for(int i=1;i<MAX_PROCESSES;i++){
+			proctable[i] = NULL;
+		}
+	}else{
+		/* Search a free slot in process table and put the created process */
+		while(proctable[pid] != NULL){
+			// Full proc table
+			if(pid == MAX_PROCESSES - 1){
+				return ENPROC;
+			}
+			pid++;
+		}
+		proctable[pid] = proc;
+		proc->p_pid = pid;
+		proc_counter++;
+	}
+
+	// initilize exitcode and is_exit and p_waitsem
 
 	return proc;
 }

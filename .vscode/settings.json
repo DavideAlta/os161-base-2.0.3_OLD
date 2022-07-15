@@ -10,6 +10,7 @@
         "atomic": "c",
         "*.tcc": "c",
         "fstream": "c",
-        "sstream": "c"
+        "sstream": "c",
+        "addrspace.h": "c"
     }
 }

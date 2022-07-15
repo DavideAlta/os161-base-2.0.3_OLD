@@ -80,6 +80,7 @@ syscall(struct trapframe *tf)
 {
 	int callno;
 	int32_t retval;
+	int status; // status of waitpid syscall
 	int err;
 
 	KASSERT(curthread != NULL);
@@ -143,9 +144,38 @@ syscall(struct trapframe *tf)
 
 		case SYS_dup2:
 		err = sys_dup2((int) tf->tf_a0,				// old fd
-				   (int) tf->tf_a1,				// new fd
-				   &retval);					// retval = new fd
+				   	   (int) tf->tf_a1,				// new fd
+				   	   &retval);					// retval = new fd
+		break;
 
+		case SYS_chdir:
+		err = sys_chdir((userptr_t)tf->tf_a0);		// pathname
+		break;
+
+		case SYS___getcwd:
+		err = sys___getcwd((userptr_t)tf->tf_a0,	// buf: name of current dir
+						   (size_t)tf->tf_a1,		// buflen: len of buf
+						   &retval);				// retval: actual len of current dir 
+		break;
+
+		case SYS_fork:
+		err = sys_fork(tf,							// trapframe of calling process
+					   &retval);					// retval: child pid in parent and 0 in child
+		break;
+
+		case SYS__exit:
+		err = sys__exit((int)tf->tf_a0);
+		break;
+
+		case SYS_waitpid:
+		err = sys_waitpid((pid_t)tf->tf_a0,
+						  &status,
+						  (int)tf->tf_a1,
+						  &retval);
+		break;
+
+		case SYS_getpid:
+		err = sys_getpid(&retval);					// retval: current process pid
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
@@ -191,7 +221,19 @@ syscall(struct trapframe *tf)
  * Thus, you can trash it and do things another way if you prefer.
  */
 void
-enter_forked_process(struct trapframe *tf)
+enter_forked_process(void *tf, unsigned long child_addrspace)
 {
-	(void)tf;
+	struct trapframe childtf = *(strct trapframe *)tf;
+
+	curthread->t_addrspace = (struct addrspace *)child_addrspace;
+	// curthtread or curproc ??
+
+	as_activate();
+	// kfree((struct trapframe *)tf); ??
+
+	childtf.tf_v0 = 0; // Return value of child (set to 0)
+	childtf.tf_a3 = 0; // Signal no errors
+	childtf.tf_epc += 4; // To no re-execute the sys_fork goes to the nex instr
+
+	mips_usermode(&childtf);
 }

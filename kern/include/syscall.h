@@ -74,4 +74,16 @@ int sys_write(int fd, userptr_t buf, size_t buflen, int *retval);
 int sys_lseek(int fd, off_t pos, int whence, int *retval);
 int sys_dup2(int oldfd, int newfd, int *retval);
 
+int sys_chdir(userptr_t pathname);
+int sys___getcwd(userptr_t buf, size_t buflen, int *retval);
+
+/*
+ * Process handling system calls
+ * (definition on syscall/proc_syscalls.c) 
+*/
+
+int sys_fork(struct trapframe *tf, pid_t *retval);
+int sys_getpid(pid_t *retval);
+
+
 #endif /* _SYSCALL_H_ */
