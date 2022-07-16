@@ -175,6 +175,10 @@ syscall(struct trapframe *tf)
 						  &retval);
 		break;
 
+		case SYS_execv:
+		err = sys_execv((const char *)tf->tf_a0,
+						 (char **)tf->tf_);
+
 		case SYS_getpid:
 		err = sys_getpid(&retval);					// retval: current process pid
 	    default:

@@ -144,6 +144,23 @@ proc_destroy(struct proc *proc)
 	KASSERT(proc != NULL);
 	KASSERT(proc != kproc);
 
+	// Orphan handling (if proc has to be destroyed but it has children)
+	// note: could be recursive (if the zombie has children)
+    for(int i=0;i<MAX_PROCESSES;i++){
+		if(proctable[i] != NULL){
+			// My child becomes orphan     
+			if(curproc->p_pid == proctable[i]->p_parentpid){
+				// My child is zombie
+				if(proctable[i]->is_exited){
+					proc_destroy(proctable[i]);
+					proctable[i] = NULL;
+				}else{
+					proctable[i]->p_parentpid = 0; // root process
+				}
+			}
+		}
+    }
+
 	/*
 	 * We don't take p_lock in here because we must have the only
 	 * reference to this structure. (Otherwise it would be

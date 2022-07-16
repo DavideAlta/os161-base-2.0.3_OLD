@@ -85,5 +85,11 @@ int sys___getcwd(userptr_t buf, size_t buflen, int *retval);
 int sys_fork(struct trapframe *tf, pid_t *retval);
 int sys_getpid(pid_t *retval);
 
+int sys_execv(const char *program, char **args);
+
 
 #endif /* _SYSCALL_H_ */
+
+int main(){
+	int vec[3] = {0, 1, 2}
+}

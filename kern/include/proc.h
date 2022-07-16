@@ -85,9 +85,6 @@ struct proc {
 	int exitcode; /* Exit code */
 
 	bool is_exited; /* The process is going to be exited */
-
-	struct semaphore p_waitsem; /* Semaphore of process for exit-waitpid mechanism */
-
 };
 
 /* Process table declaration (defined in proc.c)*/
