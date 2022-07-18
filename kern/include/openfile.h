@@ -14,7 +14,7 @@ struct openfile {
     struct vnode *of_vnode;     /* Pointer to locate the data */
     int of_flags;     /* How to open a file (O_READ, O_WRITE, etc.) */
 	int of_offset;     /* File offset */
-	struct spinlock of_lock;     /* Lock for this structure */
+	struct spinlock of_lock;     /* Lock for openfile */
 	int of_refcount;     /* Reference count */	
 };
 

@@ -29,7 +29,6 @@ int sys_open(userptr_t filename, int flags, int *retval){
     int append_mode = 0;
     int fd = -1;
     char kfilename[PATH_MAX]; // filename string inside kernel space
-    size_t actual_len;
     
     /*[1] Check arguments validity*/
     
@@ -40,8 +39,7 @@ int sys_open(userptr_t filename, int flags, int *retval){
     }
 
     // Copy the filename string from user to kernel space to protect it
-    // (used at point 3)
-    err = copyinstr(filename, kfilename, sizeof(kfilename), &actual_len);
+    err = copyinstr(filename, kfilename, sizeof(kfilename), NULL);
     if(err)
         return err;
 
@@ -78,16 +76,13 @@ int sys_open(userptr_t filename, int flags, int *retval){
     KASSERT(curproc != NULL); // curproc = curthread->t_proc
 
     /* [3] Obtain a vnode object associated to the passed file to open */
-    err = vfs_open(kfilename, flags, 0, &vn);
-    //mode = 0 (runprogram.c) or 0664 (ftest.c) ??
+    err = vfs_open(kfilename, flags, 0664, &vn);
     if(err)
         return err;
     
-    /* [4] Define a file table inside the process structure (curproc->p_filetable) */
-    
-    /* [5] Find the index of the first free slot of the file table */
+    /* [4] Find the index of the first free slot of the file table */
 
-    spinlock_acquire(&curproc->p_lock); // Giusto?
+    // spinlock_acquire(&curproc->p_lock); // A che serve ??
 
     // meglio for+break o while ?
     for(int i=STDERR_FILENO+1; i<OPEN_MAX; i++){
@@ -101,7 +96,7 @@ int sys_open(userptr_t filename, int flags, int *retval){
         return err;
     }
 
-    // [6] Allocate and fill the found ot penfile struct
+    // [5] Allocate and fill the found openfile struct
     curproc->p_filetable[fd] = (struct openfile *)kmalloc(sizeof(struct openfile));
 	KASSERT(curproc->p_filetable[fd] != NULL); // Check if the filetable is no more NULL
 
@@ -124,7 +119,7 @@ int sys_open(userptr_t filename, int flags, int *retval){
 		curproc->p_filetable[fd]->of_offset = statbuf.st_size;
     }
 
-    spinlock_release(&curproc->p_lock); // Giusto?
+    // spinlock_release(&curproc->p_lock); // A che serve ??
 
     // [7] fd (i.e. retval) = Place of openfile inside the file table
     *retval = fd;

@@ -68,6 +68,7 @@ int sys_fork(struct trapframe *tf, pid_t *retval){
     for(int i=0;i<OPEN_MAX;i++) {
 		if(curproc->p_filetable[i] != NULL){
 			lock_acquire(curproc->p_filetable[i]->p_lock);
+            curproc->p_filetable[i]->p_refcount++;
 			childproc->p_filetable[i] = curproc->p_filetable[i];
 			lock_release(curproc->p_filetable[i]->p_lock);
 		}
@@ -187,16 +188,20 @@ int sys_waitpid(pid_t pid, int *status, int options, pid_t *retval){
     return 0;
 }
 
-int sys_execv(const char *program, char **args){
+/*
+ * sys_execv() is very similar to runprogram() but with some modifications
+ * Since runprogram() loads a program and start running it in usermode
+*/
+int sys_execv(const_userptr_t program, userptr_t args){
 
     int err;
-    int sizechar, maxargs, args_size=0, argc=0;
-    int args_size_i;
-    char kprogram[PATH_MAX] = (char *)kmalloc(PATH_MAX);
     struct vnode *vn;
     struct addrspace *as;
-    
-    if((progname == NULL) || (arg == NULL)) {
+    vaddr_t entrypoint, stackptr;
+    size_t program_len;
+
+    // Check arguments validity
+    if((progname == NULL) || (args == NULL)) {
 		return EFAULT;
 	}
 
@@ -205,52 +210,140 @@ int sys_execv(const char *program, char **args){
     was for the wrong platform, or contained invalid fields. ????
     */
 
-    // Size of 1 character
-    sizechar = sizeof(char);
-    // Max number of args[] elements (if each one is a char)
-    maxargs = ARG_MAX/sizechar;
-    for(int i=0;i<maxargs;i++){
-        if(args[i] != NULL){
-            args_size =+ sizechar*(strlen(args[i])+1);
-            argc++;
-            // The total size of the argument strings exceeeds ARG_MAX.
-            if(args_size > ARG_MAX){
-                err = E2BIG;
-                return err;
-            }
-        }else{
-            // Last argument (is always NULL)
-            break;
-        }
-    }
+    /* 1. Compute argc */
 
-    // Move arguments to kernel space
-    err = copyinstr((const_userptr_t)program, kprogram, PATH_MAX, NULL);
+    // The n. of elements of args[] is unknown but the last argument should be NULL.
+    // Compute argc = n. of valid arguments in args[]
+    int argc = 0;
+    int args_size = 0 // Total size of the argument strings
+    while(args[argc] != NULL){
+        // Accumulate the size of each args[] element
+        args_size =+ sizeof(char)*(strlen(args[argc])+1);
+        // The total size of the argument strings exceeeds ARG_MAX.
+        if(args_size > ARG_MAX){
+            err = E2BIG;
+            return err;
+        }
+        argc ++;
+    }
+    // Now argc contains the number of valid arguments inside args[]
+
+    /* 2. Copy arguments from user space into kernel space. */
+
+    // - Program path
+    char kprogram[PATH_MAX] = (char *)kmalloc(PATH_MAX);
+    err = copyinstr(program, kprogram, PATH_MAX, &program_len);
     if(err){
         return err;
     }
 
-    char *kargs[argc];
-
+    // - Single arguments
+    char *kargs; // array of char (= 1 byte)
+    int args_size_i; // Size of i-th argument string
+    int actual_len = 0;
+    int padding = 0;
+    int cur_pos = 0;
+    int arg_pointers[argc];
+    // Suppose to have these arguments: "foo\0" "hello\0" "1\0"
     for(int i=0;i<argc;i++){
-        args_size_i = sizechar*(strlen(args[i])+1);
-        kargs[i] = (char *)kmalloc(args_size_i);
-        err = copyinstr(args[i], kargs[i], args_size_i, NULL); //int because is a pointer
+        // Allocate in kernel space a space for a string of size of args[i] 
+        args_size_i = sizeof(char)*(strlen(args[i])+1);
+        //kargs[i] = (char *)kmalloc(args_size_i); // dev'essere in multipli di 4????? o lo tolgo proprio????
+        // Move args to kernel space
+        err = copyinstr(args[i], &kargs[cur_pos], args_size_i, &actual_len); // actual_len = 4 (foo\0) 6 (hello\0) 2 (1\0)
         if(err){
             return err;
         }
+        arg_pointers[i] = cur_pos;
+        cur_pos += actual_len; // cur_pos = 4 > 10 > 14
+        // if the argument string has no exactly 4 bytes '\0'-padding is needed
+        if((actual_len%4) != 0){
+            // n. of bytes to pad at '\0'
+            padding = 4 - actual_len%4; // padding = 2 > 2
+            for(int j=0;j<padding;j++){
+                kargs[cur_pos + j] = '\0';
+            }
+            cur_pos += padding; // cur_pos = 4 > 12 > 16
+        }
     }
+    // Now kargs[] is the copy of args in kernel space with the proper padding
+    // Now cur_pos has the size of kargs[] array
 
-    // Initilize the vnode struct associated to program
-    err = vfs_open(program, O_RDONLY, 0, &vn);
+    /* 3. Create a new address space and load the executable into it
+     * (same of runprogram) */
+
+    // Open the "program" file
+    err = vfs_open(kprogram, O_RDONLY, 0, &vn);
     if(err){
         return err;
     }
 
-    // Create an address space structure
-    as = as_create();
+    // Create a new address space
+	as = as_create();
+	if(as == NULL) {
+		vfs_close(vn);
+		err = ENOMEM;
+        return err;
+	}
 
-    // ...
+    // Change the current address space and activate it
+	proc_setas(as);
+	as_activate();
 
-    return 0;
+    // Load the executable "program"
+	err = load_elf(vn, &entrypoint);
+	if (err) {
+		vfs_close(vn);
+		return err;
+	}
+
+    // File is loaded and can be closed
+	vfs_close(vn);
+
+    // Define the user stack in the address space
+	err = as_define_stack(as, &stackptr);
+	if (err) {
+		return err;
+	}
+
+    /* 4. Copy the arguments from kernel space to user stack*/
+
+    // argc is updated with prgogram name
+    argc++;
+
+    // Start position of the stack
+    stackptr -= cur_pos;
+
+    // Space to add for program path = 
+    // = program path length (with padding) + 4 bytes for pointer args[]
+    stackptr -= program_len + (4 - program_len%4) + 4;
+
+    for(int i=0;i<argc;i++){
+        copyout(kargs[i],);
+    }
+
+
+
+
+
+    copyout(kargs, (userptr_t)stackptr, cur_pos);
+
+
+    
+
+    /* 5. Warp to user mode
+     * (same of runprogram) */
+
+	enter_new_process(argc /*argc*/, NULL /*userspace addr of argv*/,
+			  NULL /*userspace addr of environment*/,
+			  stackptr, entrypoint);
+
+    // PASSARE ARGC E ARGV COPIATI NELLO USER STACK
+
+    // enter_new_process does not return
+	panic("enter_new_process in execv returned\n");
+
+    err = EINVAL;
+
+    return err;
 }

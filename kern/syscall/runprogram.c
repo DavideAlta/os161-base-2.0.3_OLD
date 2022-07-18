@@ -36,6 +36,7 @@
 #include <types.h>
 #include <kern/errno.h>
 #include <kern/fcntl.h>
+#include <kern/unistd.h> 
 #include <lib.h>
 #include <proc.h>
 #include <current.h>
@@ -44,6 +45,8 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+
+#define CONSOLE_PATH "con:"
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -55,7 +58,7 @@ int
 runprogram(char *progname)
 {
 	struct addrspace *as;
-	struct vnode *v;
+	struct vnode *v, *v_stdin, *v_stdout, *v_stderr;
 	vaddr_t entrypoint, stackptr;
 	int result;
 
@@ -97,6 +100,9 @@ runprogram(char *progname)
 		return result;
 	}
 
+	/* Open the console files */
+	console_init();
+
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
@@ -107,3 +113,45 @@ runprogram(char *progname)
 	return EINVAL;
 }
 
+/*
+ * Open the console files: STDIN, STDOUT and STDERR
+ */
+void
+console_init(void)
+{
+	struct vnode *v_stdin, *v_stdout, *v_stderr;
+	int result;
+
+	result = vfs_open(CONSOLE_PATH, O_RDONLY, 0664, &v_stdin);
+	if (result) {
+		return result;
+	}
+	curproc->p_filetable[STDIN_FILENO]->of_vnode = v_stdin;
+	curproc->p_filetable[STDIN_FILENO]->of_offset = 0; // dummy
+    curproc->p_filetable[STDIN_FILENO]->of_flags = O_RDONLY;
+    curproc->p_filetable[STDIN_FILENO]->of_refcount = 0;
+    spinlock_init(&curproc->p_filetable[STDIN_FILENO]->of_lock);
+
+
+	result = vfs_open(CONSOLE_PATH, O_WRONLY, 0664, &v_stdout);
+	if (result) {
+		return result;
+	}
+	curproc->p_filetable[STDOUT_FILENO]->of_vnode = v_stdout;
+	curproc->p_filetable[STDOUT_FILENO]->of_offset = 0; // dummy
+    curproc->p_filetable[STDOUT_FILENO]->of_flags = O_WRONLY;
+    curproc->p_filetable[STDOUT_FILENO]->of_refcount = 0;
+    spinlock_init(&curproc->p_filetable[STDOUT_FILENO]->of_lock);
+
+	result = vfs_open(CONSOLE_PATH, O_WRONLY, 0664, &v_stderr);
+	if (result) {
+		return result;
+	}
+	curproc->p_filetable[STDERR_FILENO]->of_vnode = v_stderr;
+	curproc->p_filetable[STDERR_FILENO]->of_offset = 0; // dummy
+    curproc->p_filetable[STDERR_FILENO]->of_flags = O_WRONLY;
+    curproc->p_filetable[STDERR_FILENO]->of_refcount = 0;
+    spinlock_init(&curproc->p_filetable[STDERR_FILENO]->of_lock);
+
+	return;
+}

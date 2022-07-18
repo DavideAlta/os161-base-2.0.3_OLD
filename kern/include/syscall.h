@@ -89,7 +89,3 @@ int sys_execv(const char *program, char **args);
 
 
 #endif /* _SYSCALL_H_ */
-
-int main(){
-	int vec[3] = {0, 1, 2}
-}
