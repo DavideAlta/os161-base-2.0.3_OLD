@@ -34,7 +34,7 @@
  * Declarations for test code and other miscellaneous high-level
  * functions.
  */
-
+#include <proc.h>
 
 /*
  * Test code.
@@ -97,8 +97,7 @@ int nettest(int, char **);
 
 /* Routine for running a user-level program. */
 int runprogram(char *progname);
-void console_init(void);
-
+int console_init(struct proc *proc);
 
 /* Kernel menu system. */
 void menu(char *argstr);

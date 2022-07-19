@@ -35,6 +35,8 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
+#include <addrspace.h>
+#include <proc.h>
 
 
 /*
@@ -176,8 +178,8 @@ syscall(struct trapframe *tf)
 		break;
 
 		case SYS_execv:
-		err = sys_execv((const char *)tf->tf_a0,
-						 (char **)tf->tf_);
+		err = sys_execv((char *)tf->tf_a0,
+						 (char **)tf->tf_a1);
 
 		case SYS_getpid:
 		err = sys_getpid(&retval);					// retval: current process pid
@@ -225,20 +227,19 @@ syscall(struct trapframe *tf)
  *
  * Thus, you can trash it and do things another way if you prefer.
  */
-void
-enter_forked_process(void *tf, unsigned long child_addrspace)
+void *enter_forked_process(void *tf, unsigned long child_addrspace)
 {
-	struct trapframe childtf = *(strct trapframe *)tf;
+	struct trapframe *childtf = (struct trapframe *)tf;
 
-	curthread->t_addrspace = (struct addrspace *)child_addrspace;
-	// curthtread or curproc ??
+	curproc->p_addrspace = (struct addrspace *)child_addrspace;
+	// la libreria proc.h non c'è
 
 	as_activate();
 	// kfree((struct trapframe *)tf); ??
 
-	childtf.tf_v0 = 0; // Return value of child (set to 0)
-	childtf.tf_a3 = 0; // Signal no errors
-	childtf.tf_epc += 4; // To no re-execute the sys_fork goes to the nex instr
+	childtf->tf_v0 = 0; // Return value of child (set to 0)
+	childtf->tf_a3 = 0; // Signal no errors
+	childtf->tf_epc += 4; // To no re-execute the sys_fork goes to the nex instr
 
-	mips_usermode(&childtf);
+	mips_usermode(childtf);
 }

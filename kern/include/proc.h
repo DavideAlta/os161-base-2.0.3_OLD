@@ -85,6 +85,8 @@ struct proc {
 	int exitcode; /* Exit code */
 
 	bool is_exited; /* The process is going to be exited */
+
+	struct semaphore p_waitsem; /* Semaphore for wait-exit mechanism*/
 };
 
 /* Process table declaration (defined in proc.c)*/
@@ -95,6 +97,9 @@ extern int proc_counter; // ??
 
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
+
+/*static*/
+struct proc *proc_create(const char *name);
 
 /* Call once during system startup to allocate data structures. */
 void proc_bootstrap(void);

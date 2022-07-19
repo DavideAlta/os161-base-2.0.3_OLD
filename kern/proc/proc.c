@@ -50,6 +50,9 @@
 #include <vnode.h>
 #include <kern/unistd.h> // STDIN, STDOUT, STDERR
 #include <limits.h> // OPEN_MAX
+#include <vfs.h>
+#include <kern/fcntl.h>
+#include <openfile.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -65,7 +68,7 @@ int proc_counter;
 /*
  * Create a proc structure.
  */
-static
+/*static*/
 struct proc *
 proc_create(const char *name)
 {
@@ -100,7 +103,7 @@ proc_create(const char *name)
 	if(strcmp(name,"[kernel]") == 0){
 		proc->p_pid = 0;
 		proc->p_parentpid = 0;
-		proctable[0] = curproc;
+		proctable[0] = proc;
 		proc_counter = 1;
 		for(int i=1;i<MAX_PROCESSES;i++){
 			proctable[i] = NULL;
@@ -108,10 +111,6 @@ proc_create(const char *name)
 	}else{
 		/* Search a free slot in process table and put the created process */
 		while(proctable[pid] != NULL){
-			// Full proc table
-			if(pid == MAX_PROCESSES - 1){
-				return ENPROC;
-			}
 			pid++;
 		}
 		proctable[pid] = proc;
@@ -250,6 +249,7 @@ struct proc *
 proc_create_runprogram(const char *name)
 {
 	struct proc *newproc;
+	//int result;
 
 	newproc = proc_create(name);
 	if (newproc == NULL) {

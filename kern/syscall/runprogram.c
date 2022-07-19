@@ -39,14 +39,13 @@
 #include <kern/unistd.h> 
 #include <lib.h>
 #include <proc.h>
+#include <openfile.h>
 #include <current.h>
 #include <addrspace.h>
 #include <vm.h>
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
-
-#define CONSOLE_PATH "con:"
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -58,9 +57,10 @@ int
 runprogram(char *progname)
 {
 	struct addrspace *as;
-	struct vnode *v, *v_stdin, *v_stdout, *v_stderr;
+	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
+	struct proc *proc = curproc;
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -85,7 +85,7 @@ runprogram(char *progname)
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
 	if (result) {
-		/* p_addrspace will go away when curproc is destroyed */
+		/* p_addrspace will go away when proc is destroyed */
 		vfs_close(v);
 		return result;
 	}
@@ -96,12 +96,15 @@ runprogram(char *progname)
 	/* Define the user stack in the address space */
 	result = as_define_stack(as, &stackptr);
 	if (result) {
-		/* p_addrspace will go away when curproc is destroyed */
+		/* p_addrspace will go away when proc is destroyed */
 		return result;
 	}
 
-	/* Open the console files */
-	console_init();
+	/* Open the console files: STDIN, STDOUT and STDERR */
+	console_init(proc);
+	if(result){
+		return result;
+	}
 
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
@@ -116,42 +119,62 @@ runprogram(char *progname)
 /*
  * Open the console files: STDIN, STDOUT and STDERR
  */
-void
-console_init(void)
+int
+console_init(struct proc *proc)
 {
 	struct vnode *v_stdin, *v_stdout, *v_stderr;
 	int result;
+	char *kconsole = (char *)kmalloc(5);
+	// Support openfile object
+	struct openfile *of_tmp;
+	of_tmp = kmalloc(sizeof(struct openfile));
 
-	result = vfs_open(CONSOLE_PATH, O_RDONLY, 0664, &v_stdin);
+	strcpy(kconsole,"con:");
+
+	/*result = copyinstr((const_userptr_t)"con:", kconsole, 5, NULL);
+	if (result) {
+		return result;
+	}*/
+	
+	result = vfs_open(kconsole, O_RDONLY, 0664, &v_stdin);
 	if (result) {
 		return result;
 	}
-	curproc->p_filetable[STDIN_FILENO]->of_vnode = v_stdin;
-	curproc->p_filetable[STDIN_FILENO]->of_offset = 0; // dummy
-    curproc->p_filetable[STDIN_FILENO]->of_flags = O_RDONLY;
-    curproc->p_filetable[STDIN_FILENO]->of_refcount = 0;
-    spinlock_init(&curproc->p_filetable[STDIN_FILENO]->of_lock);
+	of_tmp->of_vnode = v_stdin;
+	of_tmp->of_flags = O_RDONLY;
+	of_tmp->of_offset = 0; // dummy
+    of_tmp->of_refcount = 0;
+    spinlock_init(&of_tmp->of_lock);
 
+	proc->p_filetable[STDIN_FILENO] = of_tmp;
 
-	result = vfs_open(CONSOLE_PATH, O_WRONLY, 0664, &v_stdout);
+	strcpy(kconsole,"con:");
+
+	result = vfs_open(kconsole, O_WRONLY, 0664, &v_stdout);
 	if (result) {
 		return result;
 	}
-	curproc->p_filetable[STDOUT_FILENO]->of_vnode = v_stdout;
-	curproc->p_filetable[STDOUT_FILENO]->of_offset = 0; // dummy
-    curproc->p_filetable[STDOUT_FILENO]->of_flags = O_WRONLY;
-    curproc->p_filetable[STDOUT_FILENO]->of_refcount = 0;
-    spinlock_init(&curproc->p_filetable[STDOUT_FILENO]->of_lock);
+	of_tmp->of_vnode = v_stdout;
+	of_tmp->of_flags = O_WRONLY;
+	of_tmp->of_offset = 0; // dummy
+    of_tmp->of_refcount = 0;
+    spinlock_init(&of_tmp->of_lock);
 
-	result = vfs_open(CONSOLE_PATH, O_WRONLY, 0664, &v_stderr);
+	proc->p_filetable[STDOUT_FILENO] = of_tmp;
+
+	strcpy(kconsole,"con:");
+
+	result = vfs_open(kconsole, O_WRONLY, 0664, &v_stderr);
 	if (result) {
 		return result;
 	}
-	curproc->p_filetable[STDERR_FILENO]->of_vnode = v_stderr;
-	curproc->p_filetable[STDERR_FILENO]->of_offset = 0; // dummy
-    curproc->p_filetable[STDERR_FILENO]->of_flags = O_WRONLY;
-    curproc->p_filetable[STDERR_FILENO]->of_refcount = 0;
-    spinlock_init(&curproc->p_filetable[STDERR_FILENO]->of_lock);
+	of_tmp->of_vnode = v_stderr;
+	of_tmp->of_flags = O_WRONLY;
+	of_tmp->of_offset = 0; // dummy
+    of_tmp->of_refcount = 0;
+    spinlock_init(&of_tmp->of_lock);
 
-	return;
+	proc->p_filetable[STDERR_FILENO] = of_tmp;
+
+	return 0;
 }
