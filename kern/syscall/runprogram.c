@@ -46,6 +46,7 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <copyinout.h>
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -54,13 +55,19 @@
  * Calls vfs_open on progname and thus may destroy it.
  */
 int
-runprogram(char *progname)
+runprogram(char *progname, char **args, unsigned long nargs)
 {
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
 	struct proc *proc = curproc;
+	int argc = nargs;
+	char **kargs = (char **)kmalloc(argc*PATH_MAX);
+
+	for(int i=0;i<argc;i++){
+		copyinstr((userptr_t)args[i],kargs[i],PATH_MAX,NULL);
+	}
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -81,6 +88,8 @@ runprogram(char *progname)
 	/* Switch to it and activate it. */
 	proc_setas(as);
 	as_activate();
+
+	//spinlock_acquire(&proctable[proc->p_parentpid]->p_lock);
 
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
@@ -106,8 +115,39 @@ runprogram(char *progname)
 		return result;
 	}
 
+	// TO TEST ---------------------------------------
+	
+	// Copy the arguments from kernel space to user stack
+
+	// Array with the arguments positions (+1 to consider the last NULL argument)
+	vaddr_t arg_pointers[argc+1];
+	int stackpos = 0; // Support variable to move inside the stack
+	int len_i; // Length of i-th argument
+	int padding; // N. of 0s to insert at the end of the argument
+
+	for(int i=0;i<argc;i++){
+		len_i = strlen(kargs[i])+1;
+		padding = 4 - len_i%4;
+		stackpos += len_i + padding;
+		arg_pointers[i] = stackptr - stackpos;
+		copyout(kargs[i], (userptr_t)arg_pointers[i], len_i);
+	}
+	arg_pointers[argc] = 0; // The last argument points to 0 (NULL)
+
+	// Copy the pointers to arguments into the user stack
+	// (the array to copy has been filled before)
+
+	// Update the stackptr with the position in which copy the pointers
+
+	stackptr = arg_pointers[argc-1] - 4*(argc+1);
+	copyout(arg_pointers, (userptr_t)stackptr, 4*(argc+1));
+
+	//spinlock_release(&proctable[proc->p_parentpid]->p_lock);
+
+	// TO TEST ----------------------------------------
+
 	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
 
@@ -178,3 +218,12 @@ console_init(struct proc *proc)
 
 	return 0;
 }
+
+/*
+ * Copies the arguments from the kernel space
+ * into the user stack
+ * (it is called by runprogram and execv)
+ */
+/*
+int copyout_args(char **args, vaddr_t *stackptr){}
+*/

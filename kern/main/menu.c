@@ -88,7 +88,7 @@ cmd_progthread(void *ptr, unsigned long nargs)
 
 	strcpy(progname, args[0]);
 
-	result = runprogram(progname);
+	result = runprogram(progname,args,nargs);
 	if (result) {
 		kprintf("Running program %s failed: %s\n", args[0],
 			strerror(result));
@@ -127,6 +127,7 @@ common_prog(int nargs, char **args)
 			proc /* new process */,
 			cmd_progthread /* thread function */,
 			args /* thread arg */, nargs /* thread arg */);
+
 	if (result) {
 		kprintf("thread_fork failed: %s\n", strerror(result));
 		proc_destroy(proc);
@@ -137,6 +138,8 @@ common_prog(int nargs, char **args)
 	 * The new process will be destroyed when the program exits...
 	 * once you write the code for handling that.
 	 */
+
+	//spinlock_acquire(&proc->p_lock);
 
 	return 0;
 }

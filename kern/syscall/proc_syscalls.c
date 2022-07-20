@@ -243,7 +243,7 @@ int sys_execv(char *program, char **args){
     //int args_size_i; // Size of i-th argument string
     size_t actual_len;
     int padding = 0;
-    int cur_pos = 0;
+    int cur_pos = 4*argc; // The starting position is over the arg pointers (each pointer is a 4bytes integer)
     int arg_pointers[argc+1]; // Offsets of the arguments in the buffer
     // Suppose to have these arguments: "foo\0" "hello\0" "1\0"
     for(int i=0;i<argc;i++){
@@ -353,7 +353,7 @@ int sys_execv(char *program, char **args){
     for(int j=0;j<argc;j++){
         // Position of argument in the stack
         arg_pointer_stack = (char *)(stackptr + arg_pointers[j]);
-        // Position of the pointer to the argument in the stack (don')
+        // Position of the pointer to the argument in the stack
         stackpos += 4;
         copyout((const void*)arg_pointer_stack,(userptr_t)stackpos,4);
     }
