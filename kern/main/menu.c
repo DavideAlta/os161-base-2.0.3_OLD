@@ -139,7 +139,24 @@ common_prog(int nargs, char **args)
 	 * once you write the code for handling that.
 	 */
 
-	//spinlock_acquire(&proc->p_lock);
+	while(proc->runprogram_finished == 0);
+
+	//sys_waitpid();
+
+	/* 2 issues:
+	 * - waitpid requires an exit by the child. But child doesn't return.
+	 * - the semaphore for waitpid-exit mechanism disable the interrupts, this
+	 *   gives some errors in the syscall dispatcher
+	*/
+
+	/* Child process:
+	 * execute the filetest program and goes into sys_open
+	 * (row 60 modified to can continue the execution, remove O_CREAT and fix the case)
+	 * Parent process:
+	 * return the error at line 219 of syscall disaptcher (WHY?????)
+	*/
+
+	//lock_acquire(&proctable[0]->p_arglock);
 
 	return 0;
 }

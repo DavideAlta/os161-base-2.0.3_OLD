@@ -40,8 +40,9 @@ int sys_open(userptr_t filename, int flags, int *retval){
 
     // Copy the filename string from user to kernel space to protect it
     err = copyinstr(filename, kfilename, sizeof(kfilename), NULL);
-    if(err)
+    if(err){
         return err;
+    }
 
     // Flags
     switch(flags){
@@ -56,7 +57,7 @@ int sys_open(userptr_t filename, int flags, int *retval){
         case O_CREAT|O_EXCL|O_WRONLY: break;
         case O_CREAT|O_EXCL|O_RDWR: break;
         // Truncate the file to length 0 upon open (handled by vfs_open())
-        case O_TRUNC|O_WRONLY: break;
+        case O_TRUNC|O_WRONLY|O_CREAT: break;
         case O_TRUNC|O_RDWR: break;
         // Write at the end of the file
         case O_WRONLY|O_APPEND:
@@ -69,6 +70,7 @@ int sys_open(userptr_t filename, int flags, int *retval){
         default:
             err = EINVAL;
             return err;
+            break;
     }
 
     /* [2] Check if the current thread and the associated process are no NULL */

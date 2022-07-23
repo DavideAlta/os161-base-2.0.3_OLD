@@ -501,6 +501,11 @@ thread_fork(const char *name,
 	struct thread *newthread;
 	int result;
 
+	// TO TEST -------------------------------------
+	
+
+	// TO TEST -------------------------------------
+
 	newthread = thread_create(name);
 	if (newthread == NULL) {
 		return ENOMEM;

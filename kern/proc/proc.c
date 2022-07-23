@@ -119,6 +119,7 @@ proc_create(const char *name)
 	}
 
 	// initilize exitcode and is_exit and p_waitsem
+	proc->runprogram_finished = 0;
 
 	return proc;
 }

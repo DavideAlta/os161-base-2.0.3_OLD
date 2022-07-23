@@ -47,6 +47,7 @@
 #include <syscall.h>
 #include <test.h>
 #include <copyinout.h>
+#include <spinlock.h>
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -63,11 +64,16 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	int result;
 	struct proc *proc = curproc;
 	int argc = nargs;
-	char **kargs = (char **)kmalloc(argc*PATH_MAX);
+
+	/*char **kargs = (char **)kmalloc(argc*PATH_MAX);
+	//char ret = 0;
+	size_t actual_len;
 
 	for(int i=0;i<argc;i++){
-		copyinstr((userptr_t)args[i],kargs[i],PATH_MAX,NULL);
-	}
+		//ret = strcpy((char *)kargs,args[i]);
+		copyinstr((userptr_t)args[i],(char *)kargs,PATH_MAX,&actual_len);
+		kargs = kargs + PATH_MAX;
+	}*/
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -88,8 +94,6 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	/* Switch to it and activate it. */
 	proc_setas(as);
 	as_activate();
-
-	//spinlock_acquire(&proctable[proc->p_parentpid]->p_lock);
 
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
@@ -126,11 +130,11 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	int padding; // N. of 0s to insert at the end of the argument
 
 	for(int i=0;i<argc;i++){
-		len_i = strlen(kargs[i])+1;
+		len_i = strlen(args[i])+1;
 		padding = 4 - len_i%4;
 		stackpos += len_i + padding;
 		arg_pointers[i] = stackptr - stackpos;
-		copyout(kargs[i], (userptr_t)arg_pointers[i], len_i);
+		copyout(args[i], (userptr_t)arg_pointers[i], len_i);
 	}
 	arg_pointers[argc] = 0; // The last argument points to 0 (NULL)
 
@@ -142,9 +146,11 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	stackptr = arg_pointers[argc-1] - 4*(argc+1);
 	copyout(arg_pointers, (userptr_t)stackptr, 4*(argc+1));
 
-	//spinlock_release(&proctable[proc->p_parentpid]->p_lock);
+	//lock_release(&proctable[curproc->p_parentpid]->p_arglock);
 
 	// TO TEST ----------------------------------------
+
+	proc->runprogram_finished = 1;
 
 	/* Warp to user mode. */
 	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
