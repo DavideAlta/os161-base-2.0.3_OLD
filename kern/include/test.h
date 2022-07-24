@@ -98,6 +98,7 @@ int nettest(int, char **);
 /* Routine for running a user-level program. */
 int runprogram(char *progname, char **args, unsigned long nargs);
 int console_init(struct proc *proc);
+int wait_runprog(struct proc *proc);
 
 /* Kernel menu system. */
 void menu(char *argstr);

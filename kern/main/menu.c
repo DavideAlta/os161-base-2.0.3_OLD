@@ -139,24 +139,28 @@ common_prog(int nargs, char **args)
 	 * once you write the code for handling that.
 	 */
 
-	while(proc->runprogram_finished == 0);
+	
 
-	//sys_waitpid();
+	wait_runprog(proc);
 
-	/* 2 issues:
-	 * - waitpid requires an exit by the child. But child doesn't return.
-	 * - the semaphore for waitpid-exit mechanism disable the interrupts, this
-	 *   gives some errors in the syscall dispatcher
+	/* Possible choices:
+	 * - Copy locally the arguments in runprogram to can use 
+	 *   them without blocking the kernel process (tried but not working)
+	 * - Suspend the kernel process execution to wait for child
+	 *   termination (i.e. termination to use the arguments, before enter_new_process)
+	 *   BUT this gives some errors with the interrupts in the syscall dispatcher.
+	 *   A possibility is waitpid() but it requires an exit() by the child
+	 *   and it doesn't return.
+	 * For the waiting approach see the function wait_runprog()	
 	*/
 
-	/* Child process:
+	/* Situation with the waiting approach:
+	 * Child process
 	 * execute the filetest program and goes into sys_open
 	 * (row 60 modified to can continue the execution, remove O_CREAT and fix the case)
-	 * Parent process:
+	 * Parent process
 	 * return the error at line 219 of syscall disaptcher (WHY?????)
 	*/
-
-	//lock_acquire(&proctable[0]->p_arglock);
 
 	return 0;
 }

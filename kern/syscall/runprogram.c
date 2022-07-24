@@ -65,13 +65,14 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	struct proc *proc = curproc;
 	int argc = nargs;
 
-	/*char **kargs = (char **)kmalloc(argc*PATH_MAX);
-	//char ret = 0;
+	/* Local copying of args:
+	char **kargs = (char **)kmalloc(argc*PATH_MAX);
+	char ret = 0;
 	size_t actual_len;
 
 	for(int i=0;i<argc;i++){
-		//ret = strcpy((char *)kargs,args[i]);
-		copyinstr((userptr_t)args[i],(char *)kargs,PATH_MAX,&actual_len);
+		strcpy((char *)kargs,args[i]);
+		//copyinstr((userptr_t)args[i],(char *)kargs,PATH_MAX,&actual_len);
 		kargs = kargs + PATH_MAX;
 	}*/
 
@@ -118,10 +119,10 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	if(result){
 		return result;
 	}
-
-	// TO TEST ---------------------------------------
 	
-	// Copy the arguments from kernel space to user stack
+	/* Copy the arguments from kernel space to user stack */
+	// TODO: manca il padding ma dovrebbe funzionare 
+	// perchè le stringhe terminano per \0
 
 	// Array with the arguments positions (+1 to consider the last NULL argument)
 	vaddr_t arg_pointers[argc+1];
@@ -142,15 +143,12 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	// (the array to copy has been filled before)
 
 	// Update the stackptr with the position in which copy the pointers
-
 	stackptr = arg_pointers[argc-1] - 4*(argc+1);
 	copyout(arg_pointers, (userptr_t)stackptr, 4*(argc+1));
 
-	//lock_release(&proctable[curproc->p_parentpid]->p_arglock);
-
-	// TO TEST ----------------------------------------
-
+	/* Release the waiting of the parent process*/
 	proc->runprogram_finished = 1;
+    //V(&proc->p_waitsem);
 
 	/* Warp to user mode. */
 	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
@@ -176,11 +174,6 @@ console_init(struct proc *proc)
 	of_tmp = kmalloc(sizeof(struct openfile));
 
 	strcpy(kconsole,"con:");
-
-	/*result = copyinstr((const_userptr_t)"con:", kconsole, 5, NULL);
-	if (result) {
-		return result;
-	}*/
 	
 	result = vfs_open(kconsole, O_RDONLY, 0664, &v_stdin);
 	if (result) {
@@ -233,3 +226,21 @@ console_init(struct proc *proc)
 /*
 int copyout_args(char **args, vaddr_t *stackptr){}
 */
+
+/* 
+ * wait for runprogram termination particularly
+ * that runprogram finish to use the arguments
+ * (just before enter_new_process)
+ * 
+ */
+int wait_runprog(struct proc *proc){
+
+	// this variable is set to 1 by runprogram() when
+	// the arguments copying is terminated
+	while(proc->runprogram_finished == 0);
+
+	// Alternative: semaphores
+    //P(&proc->p_waitsem);
+
+	return 0;
+}
