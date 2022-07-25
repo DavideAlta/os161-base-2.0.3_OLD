@@ -48,6 +48,7 @@
 #include <test.h>
 #include <copyinout.h>
 #include <spinlock.h>
+#include <syscall.h>
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -147,8 +148,7 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	copyout(arg_pointers, (userptr_t)stackptr, 4*(argc+1));
 
 	/* Release the waiting of the parent process*/
-	proc->runprogram_finished = 1;
-    //V(&proc->p_waitsem);
+	sys__exit(0);
 
 	/* Warp to user mode. */
 	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
@@ -214,33 +214,6 @@ console_init(struct proc *proc)
     spinlock_init(&of_tmp->of_lock);
 
 	proc->p_filetable[STDERR_FILENO] = of_tmp;
-
-	return 0;
-}
-
-/*
- * Copies the arguments from the kernel space
- * into the user stack
- * (it is called by runprogram and execv)
- */
-/*
-int copyout_args(char **args, vaddr_t *stackptr){}
-*/
-
-/* 
- * wait for runprogram termination particularly
- * that runprogram finish to use the arguments
- * (just before enter_new_process)
- * 
- */
-int wait_runprog(struct proc *proc){
-
-	// this variable is set to 1 by runprogram() when
-	// the arguments copying is terminated
-	while(proc->runprogram_finished == 0);
-
-	// Alternative: semaphores
-    //P(&proc->p_waitsem);
 
 	return 0;
 }

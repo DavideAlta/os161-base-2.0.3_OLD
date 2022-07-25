@@ -115,7 +115,8 @@ int
 common_prog(int nargs, char **args)
 {
 	struct proc *proc;
-	int result;
+	int result, status;
+	pid_t pid;
 
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
@@ -139,28 +140,11 @@ common_prog(int nargs, char **args)
 	 * once you write the code for handling that.
 	 */
 
-	
-
-	wait_runprog(proc);
-
-	/* Possible choices:
-	 * - Copy locally the arguments in runprogram to can use 
-	 *   them without blocking the kernel process (tried but not working)
-	 * - Suspend the kernel process execution to wait for child
-	 *   termination (i.e. termination to use the arguments, before enter_new_process)
-	 *   BUT this gives some errors with the interrupts in the syscall dispatcher.
-	 *   A possibility is waitpid() but it requires an exit() by the child
-	 *   and it doesn't return.
-	 * For the waiting approach see the function wait_runprog()	
-	*/
-
-	/* Situation with the waiting approach:
-	 * Child process
-	 * execute the filetest program and goes into sys_open
-	 * (row 60 modified to can continue the execution, remove O_CREAT and fix the case)
-	 * Parent process
-	 * return the error at line 219 of syscall disaptcher (WHY?????)
-	*/
+	/* Wait for the child process termination */
+	result = sys_waitpid(proc->p_pid, &status, 0, &pid);
+	if(result){
+		return result;
+	}
 
 	return 0;
 }

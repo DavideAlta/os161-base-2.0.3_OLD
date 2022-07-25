@@ -168,7 +168,7 @@ int sys_waitpid(pid_t pid, int *status, int options, pid_t *retval){
         return err;
     }
 
-    // wait
+    // Wait
     P(&proctable[pid]->p_waitsem);
 
     *kstatus = proctable[pid]->exitcode;

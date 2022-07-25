@@ -74,6 +74,7 @@ proc_create(const char *name)
 {
 	struct proc *proc;
 	pid_t pid = 0;
+	struct semaphore *sem;
 
 	proc = kmalloc(sizeof(*proc));
 	if (proc == NULL) {
@@ -118,8 +119,9 @@ proc_create(const char *name)
 		proc_counter++;
 	}
 
-	// initilize exitcode and is_exit and p_waitsem
-	proc->runprogram_finished = 0;
+	proc->is_exited = false;
+	sem = sem_create("waitexit sem",1);
+	proc->p_waitsem = *sem; 
 
 	return proc;
 }
