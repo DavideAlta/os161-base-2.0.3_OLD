@@ -104,5 +104,7 @@ main(int argc, char *argv[])
 		err(1, "%s: remove", file);
 	}
 	printf("Passed filetest.\n");
-	return 0;
+
+	_exit(0);
+	//return 0;
 }

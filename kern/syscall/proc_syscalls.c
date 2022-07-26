@@ -18,6 +18,7 @@
 #include <syscall.h>
 #include <lib.h> // kprintf(), KASSERT()
 #include <addrspace.h>
+#include <kern/wait.h> // MKWAIT_EXIT
 
 // Definition in proc.c
 //static struct proc *proc_create(const char *name);
@@ -176,7 +177,9 @@ int sys_waitpid(pid_t pid, int *status, int options, pid_t *retval){
     // Destroy the pid process
     proc_destroy(proctable[pid]);
     // pid is now available
-    proctable[pid] = NULL; 
+    proctable[pid] = NULL;
+
+    *status = _MKWAIT_EXIT(*status);
 
     err = copyout(kstatus, (userptr_t)status, sizeof(int));
     if(err){

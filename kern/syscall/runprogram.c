@@ -148,7 +148,7 @@ runprogram(char *progname, char **args, unsigned long nargs)
 	copyout(arg_pointers, (userptr_t)stackptr, 4*(argc+1));
 
 	/* Release the waiting of the parent process*/
-	sys__exit(0);
+	//sys__exit(0);
 
 	/* Warp to user mode. */
 	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,

@@ -57,7 +57,8 @@ int sys_open(userptr_t filename, int flags, int *retval){
         case O_CREAT|O_EXCL|O_WRONLY: break;
         case O_CREAT|O_EXCL|O_RDWR: break;
         // Truncate the file to length 0 upon open (handled by vfs_open())
-        case O_TRUNC|O_WRONLY|O_CREAT: break;
+        case O_TRUNC|O_WRONLY: break;
+        case O_CREAT|O_TRUNC|O_WRONLY: break;
         case O_TRUNC|O_RDWR: break;
         // Write at the end of the file
         case O_WRONLY|O_APPEND:
@@ -217,10 +218,13 @@ int sys_write(int fd, userptr_t buf, size_t buflen, int *retval){
 
     // fd is not a valid file descriptor, or was not opened for writing
     if(fd < 0 || fd >= OPEN_MAX || curproc->p_filetable[fd] == NULL ||
-       (curproc->p_filetable[fd]->of_flags&O_RDONLY) == O_RDONLY){
+       (!(((curproc->p_filetable[fd]->of_flags&O_WRONLY) == O_WRONLY)||
+       ((curproc->p_filetable[fd]->of_flags&O_RDWR) == O_RDWR)))){
         err = EBADF;
         return err;
     }
+
+
     // Part or all of the address space pointed to by buf is invalid
     if(buf == NULL){
         err = EFAULT;
@@ -238,8 +242,9 @@ int sys_write(int fd, userptr_t buf, size_t buflen, int *retval){
                       in the uio, updating uio_resid to reflect the
                       amount written, and updating uio_offset to match.*/
 	err = VOP_WRITE(curproc->p_filetable[fd]->of_vnode, &u);
-	if (err)
+	if (err){
 		return err;
+    }
 
     /* [4] uio_resid is the amount written => retval*/
     *retval = u.uio_resid; // giusto? o metto buflen??

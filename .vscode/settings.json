@@ -11,6 +11,7 @@
         "*.tcc": "c",
         "fstream": "c",
         "sstream": "c",
-        "addrspace.h": "c"
+        "addrspace.h": "c",
+        "cstdlib": "c"
     }
 }

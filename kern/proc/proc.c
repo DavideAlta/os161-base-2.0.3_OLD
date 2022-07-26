@@ -120,7 +120,7 @@ proc_create(const char *name)
 	}
 
 	proc->is_exited = false;
-	sem = sem_create("waitexit sem",1);
+	sem = sem_create("waitexit sem",0);
 	proc->p_waitsem = *sem; 
 
 	return proc;
