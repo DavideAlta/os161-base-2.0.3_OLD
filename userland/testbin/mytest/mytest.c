@@ -8,21 +8,16 @@
 #include <err.h>
 
 int
-main(void)
+main(int argc, char *argv[])
 {
     
 	//static char writebuf[41] = "Twiddle dee dee, Twiddle dum dum.......\n";
-	//static char readbuf[41];
+	static char readbuf[5];
 
-	//const char *file;
-	//int fd, rv;
+	const char *file;
+	int fd, rv;
     
-
-
-    printf("Inizio file mytest\n");
-    return 0;
-
-	/*if (argc == 0) {
+	if (argc == 0) {
 		warnx("No arguments - running on \"testfile\"");
 		file = "testfile";
 	}
@@ -32,10 +27,9 @@ main(void)
 	}
 	else {
 		errx(1, "Usage: filetest <filename>");
-	}*/
-
-    /*printf("Pre open\n");
-
+	}
+	
+	/*
 	fd = open("test.txt", O_WRONLY, 0664);
 	if (fd<0) {
 		err(1, "%s: open for write", "test.txt");
@@ -57,22 +51,25 @@ main(void)
 		err(1, "%s: close (1st time)", "test.txt");
 	}*/
 
-	/*fd = open(file, O_RDONLY);
+	fd = open(file, O_RDONLY, 0664);
 	if (fd<0) {
 		err(1, "%s: open for read", file);
 	}
 
-	rv = read(fd, readbuf, 40);
+	rv = read(fd, readbuf, 5);
 	if (rv<0) {
 		err(1, "%s: read", file);
 	}
+
+	printf("%s",readbuf);
+
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (2nd time)", file);
-	}*/
+	}
 	/* ensure null termination */
-	/*readbuf[40] = 0;
-
+	readbuf[4] = 0;
+	/*
 	if (strcmp(readbuf, writebuf)) {
 		errx(1, "Buffer data mismatch!");
 	}
@@ -80,7 +77,7 @@ main(void)
 	rv = remove(file);
 	if (rv<0) {
 		err(1, "%s: remove", file);
-	}
-	printf("Passed filetest.\n");*/
-	//return 0;
+	}*/
+	printf("Passed filetest.\n");
+	return 0;
 }

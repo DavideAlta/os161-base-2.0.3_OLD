@@ -136,7 +136,7 @@ int sys_read(int fd, userptr_t buf, size_t size, int *retval)
     int offset; // temporary variable to store the openfile field
     struct iovec iov;
     struct uio u;
-    void *kbuf = kmalloc(size); // buffer inside kernel space
+    char kbuf[size];// = kmalloc(size); // buffer inside kernel space
 
     KASSERT(curthread != NULL);
     KASSERT(curproc != NULL );
@@ -195,7 +195,7 @@ int sys_read(int fd, userptr_t buf, size_t size, int *retval)
 int sys_write(int fd, userptr_t buf, size_t buflen, int *retval){
     
     int err;
-    void *kbuf = kmalloc(buflen); // buffer inside kernel space
+    char kbuf[PATH_MAX]; //= (char *)kmalloc(buflen+1); // buffer inside kernel space
     int offset; // temporary variable to store the openfile field
     struct iovec iov;
     struct uio u;
@@ -205,7 +205,7 @@ int sys_write(int fd, userptr_t buf, size_t buflen, int *retval){
 
     // Copy the buffer from user to kernel space to protect it
     // (used at point 2)
-    err = copyin(buf, kbuf, buflen);
+    err = copyinstr(buf, kbuf, sizeof(kbuf), NULL);
     if(err){
         kfree(kbuf);
         return err;
@@ -234,7 +234,7 @@ int sys_write(int fd, userptr_t buf, size_t buflen, int *retval){
     offset = curproc->p_filetable[fd]->of_offset;
 
     /* [2] Setup the uio record (use a proper function to init all fields) */
-	uio_kinit(&iov, &u, kbuf, buflen, offset, UIO_WRITE);
+	uio_kinit(&iov, &u, kbuf, sizeof(kbuf), (off_t)offset, UIO_WRITE);
     u.uio_space = curproc->p_addrspace;
 	u.uio_segflg = UIO_USERSPACE; // for user space address
 
