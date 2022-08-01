@@ -195,21 +195,23 @@ int sys_read(int fd, userptr_t buf, size_t size, int *retval)
 int sys_write(int fd, userptr_t buf, size_t buflen, int *retval){
     
     int err;
-    char kbuf[PATH_MAX]; //= (char *)kmalloc(buflen+1); // buffer inside kernel space
+    //char kbuf[PATH_MAX];
     int offset; // temporary variable to store the openfile field
     struct iovec iov;
     struct uio u;
+    struct openfile *of;
 
     KASSERT(curthread != NULL);
     KASSERT(curproc != NULL );
 
-    // Copy the buffer from user to kernel space to protect it
-    // (used at point 2)
-    err = copyinstr(buf, kbuf, sizeof(kbuf), NULL);
+    // Copy the buffer from user to kernel space
+    /*err = copyinstr(buf, kbuf, sizeof(kbuf), NULL);
     if(err){
         kfree(kbuf);
         return err;
-    }
+    }*/
+
+    of = curproc->p_filetable[fd];
 
     // Synchronization of writing operations (the file must be locked during writing)
     spinlock_acquire(&curproc->p_filetable[fd]->of_lock);
@@ -234,14 +236,14 @@ int sys_write(int fd, userptr_t buf, size_t buflen, int *retval){
     offset = curproc->p_filetable[fd]->of_offset;
 
     /* [2] Setup the uio record (use a proper function to init all fields) */
-	uio_kinit(&iov, &u, kbuf, sizeof(kbuf), (off_t)offset, UIO_WRITE);
+	uio_uinit(&iov, &u, buf, buflen, (off_t)offset, UIO_WRITE);
     u.uio_space = curproc->p_addrspace;
 	u.uio_segflg = UIO_USERSPACE; // for user space address
 
     /*[3] VOP_WRITE - Write data from uio to file at offset specified
                       in the uio, updating uio_resid to reflect the
                       amount written, and updating uio_offset to match.*/
-	err = VOP_WRITE(curproc->p_filetable[fd]->of_vnode, &u);
+	err = VOP_WRITE(of->of_vnode, &u);
 	if (err){
 		return err;
     }

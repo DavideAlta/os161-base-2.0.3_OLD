@@ -76,7 +76,6 @@ int sys_dup2(int oldfd, int newfd, int *retval);
 
 int sys_chdir(userptr_t pathname);
 int sys___getcwd(userptr_t buf, size_t buflen, int *retval);
-
 /*
  * Process handling system calls
  * (definition on syscall/proc_syscalls.c) 
